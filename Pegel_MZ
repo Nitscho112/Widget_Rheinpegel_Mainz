@@ -1,0 +1,166 @@
+<!doctype html>
+<html lang="de">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Rhein • Mainz – Pegel (24 h, Tendenz)</title>
+  <meta http-equiv="Cache-Control" content="no-store" />
+  <style>
+    :root{
+      --bg:#0b1220; --card:#111827; --fg:#e5e7eb; --muted:#94a3b8;
+      --up:#16a34a; --flat:#64748b; --down:#dc2626;
+    }
+    *{box-sizing:border-box}
+    body{margin:0;background:var(--bg);color:var(--fg);font-family:system-ui,-apple-system,Segoe UI,Roboto,Arial,sans-serif;display:flex;align-items:center;justify-content:center;min-height:100vh}
+    .card{width:100%;max-width:680px;background:var(--card);border-radius:16px;box-shadow:0 8px 30px rgba(0,0,0,.35);padding:18px 20px}
+    .row{display:flex;gap:16px;align-items:baseline;flex-wrap:wrap}
+    .place{font-size:18px;letter-spacing:.2px}
+    .value{font-size:64px;font-weight:800;line-height:1}
+    .unit{font-size:18px;margin-left:6px;opacity:.9}
+    .time{font-size:13px;color:var(--muted)}
+    .trend{margin-left:auto;display:flex;align-items:center;gap:8px}
+    .trend svg{width:28px;height:28px;display:block}
+    .trend .label{font-size:14px;color:var(--muted)}
+    .spark{margin-top:10px;height:80px;width:100%}
+    .err{margin-top:8px;color:#fecaca;font-size:14px;min-height:1.2em}
+  </style>
+</head>
+<body>
+  <div class="card" role="group" aria-label="Pegel Rhein Mainz">
+    <div class="row">
+      <div class="place" id="place">RHEIN • MAINZ</div>
+      <div class="trend" id="trend" title="Tendenz">
+        <!-- Icon + Label per JS -->
+      </div>
+    </div>
+
+    <div class="row" style="align-items:center;margin-top:6px">
+      <div>
+        <span class="value" id="value">--</span><span class="unit">cm</span>
+      </div>
+      <div class="time" id="time">—</div>
+    </div>
+
+    <svg class="spark" id="spark" viewBox="0 0 600 100" preserveAspectRatio="none" aria-label="24h Verlauf"></svg>
+
+    <div class="err" id="err" aria-live="polite"></div>
+  </div>
+
+<script>
+const UUID = "a37a9aa3-45e9-4d90-9df6-109f3a28a5af"; // Mainz
+const BASE = "https://www.pegelonline.wsv.de/webservices/rest-api/v2";
+
+const elPlace = document.getElementById("place");
+const elValue = document.getElementById("value");
+const elTime  = document.getElementById("time");
+const elTrend = document.getElementById("trend");
+const elSpark = document.getElementById("spark");
+const elErr   = document.getElementById("err");
+
+const fmtTime = (iso) => new Intl.DateTimeFormat("de-DE", {
+  timeZone: "Europe/Berlin", dateStyle: "short", timeStyle: "short"
+}).format(new Date(iso));
+
+async function j(url){
+  const r = await fetch(url, {cache:"no-store"});
+  if(!r.ok) throw new Error(r.status+" "+r.statusText);
+  return r.json();
+}
+
+// simple SVG sparkline
+function drawSpark(points){
+  const W=600, H=100, PAD=6;
+  elSpark.setAttribute("viewBox", `0 0 ${W} ${H}`);
+  elSpark.innerHTML = "";
+  if (!points || points.length < 2) return;
+
+  const xs = points.map(p=>p.t), ys = points.map(p=>p.v);
+  const minX = Math.min(...xs), maxX = Math.max(...xs);
+  const minY = Math.min(...ys), maxY = Math.max(...ys);
+  const spanX = (maxX-minX)||1, spanY = (maxY-minY)||1;
+
+  const toX = t => PAD + (t-minX)/spanX*(W-2*PAD);
+  const toY = v => H-PAD - (v-minY)/spanY*(H-2*PAD);
+
+  let d = `M ${toX(points[0].t)} ${toY(points[0].v)}`;
+  for (let i=1;i<points.length;i++) d += ` L ${toX(points[i].t)} ${toY(points[i].v)}`;
+
+  const path = document.createElementNS("http://www.w3.org/2000/svg","path");
+  path.setAttribute("d", d);
+  path.setAttribute("fill", "none");
+  path.setAttribute("stroke", "#60a5fa");
+  path.setAttribute("stroke-width", "2.5");
+  elSpark.appendChild(path);
+}
+
+// linear regression slope (cm per hour)
+function slopePerHour(points){
+  if(points.length < 2) return 0;
+  // x = hours since first point
+  const t0 = points[0].t;
+  const xs = points.map(p => (p.t - t0)/3600_000);
+  const ys = points.map(p => p.v);
+  const n = xs.length;
+  const mean = arr => arr.reduce((a,b)=>a+b,0)/arr.length;
+  const mx = mean(xs), my = mean(ys);
+  let num=0, den=0;
+  for(let i=0;i<n;i++){ num += (xs[i]-mx)*(ys[i]-my); den += (xs[i]-mx)*(xs[i]-mx); }
+  if(den === 0) return 0;
+  return num/den; // cm per hour
+}
+
+function trendIcon(slope){
+  // thresholds in cm/h
+  const upT=0.5, downT=-0.5;
+  if (slope > upT)   return {name:"aufsteigend", color:"var(--up)",   svg:'<path d="M14 4v20M14 4l7 7M14 4l-7 7" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>'};
+  if (slope < downT) return {name:"absteigend", color:"var(--down)", svg:'<path d="M14 24V4M14 24l7-7M14 24l-7-7" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>'};
+  return {name:"gleichbleibend", color:"var(--flat)", svg:'<path d="M4 14h20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>'};
+}
+
+async function load(){
+  elErr.textContent = "";
+  try{
+    // Caption aus Station/Fluss
+    const station = await j(`${BASE}/stations/${UUID}.json`);
+    const water = (station.water?.shortname || station.water?.longname || "RHEIN").toUpperCase();
+    const place = (station.shortname || station.longname || "MAINZ").toUpperCase();
+    elPlace.textContent = `${water} • ${place}`;
+
+    // 24h Messwerte
+    const startIso = new Date(Date.now()-24*3600*1000).toISOString();
+    const ms = await j(`${BASE}/stations/${UUID}/W/measurements.json?start=${encodeURIComponent(startIso)}`);
+    if(!Array.isArray(ms) || ms.length === 0) throw new Error("Keine Messwerte (24 h).");
+
+    const points = ms
+      .filter(m => m.value != null && m.timestamp)
+      .map(m => ({ t: Date.parse(m.timestamp), v: Number(m.value) }))
+      .sort((a,b)=>a.t-b.t);
+
+    // aktueller Wert = letzter Messpunkt
+    const last = points[points.length-1];
+    elValue.textContent = Math.round(last.v);
+    elTime.textContent  = `zuletzt: ${fmtTime(last.t)}`;
+
+    // Verlauf-Sparkline
+    drawSpark(points);
+
+    // Tendenz (Regression)
+    const s = slopePerHour(points); // cm/h
+    const t = trendIcon(s);
+    elTrend.innerHTML = `
+      <svg viewBox="0 0 28 28" aria-hidden="true" style="color:${t.color}">${t.svg}</svg>
+      <span class="label">${t.name}</span>
+    `;
+    elTrend.setAttribute("title", `Tendenz: ${t.name} (${s.toFixed(2)} cm/h)`);
+
+  }catch(err){
+    elErr.textContent = "Fehler: " + (err.message || err);
+  }
+}
+
+// sofort laden + alle 60s aktualisieren
+load();
+setInterval(load, 60*1000);
+</script>
+</body>
+</html>
