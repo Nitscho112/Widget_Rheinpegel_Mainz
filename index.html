@@ -7,19 +7,19 @@
 <meta http-equiv="Cache-Control" content="no-store" />
 <style>
   :root{
-    /* Hintergrundfarben an Alamos-Grau angepasst */
-    --bg:#2c2f36;     /* Seitenhintergrund */
-    --card:#3a3d44;   /* Kartenhintergrund */
-    --fg:#e5e7eb; 
+    /* Dunkleres Grau für AMweb */
+    --bg:#2a2d32;     
+    --card:#2a2d32;   
+    --fg:#e7e9ee;
     --muted:#a0a6b3;
 
-    /* Wellenfarben in passendem Blau */
-    --wave1:#3b82f6;  /* helleres Blau */
-    --wave2:#1e3a8a;  /* dunkleres Blau */
+    /* Wellen in passendem Blau */
+    --wave1:#3b82f6;  
+    --wave2:#1e3a8a;  
 
-    --up:#dc2626;     /* Rot = steigend */
-    --flat:#94a3b8;   /* Grau = gleichbleibend */
-    --down:#16a34a;   /* Grün = fallend */
+    --up:#dc2626;     
+    --flat:#9aa3af;   
+    --down:#16a34a;   
   }
   *{box-sizing:border-box}
   html,body{height:100%}
@@ -30,7 +30,9 @@
   }
   .card{
     width:100%; max-width:760px; background:var(--card);
-    border-radius:20px; overflow:hidden; box-shadow:0 12px 30px rgba(0,0,0,.35);
+    border-radius:20px; overflow:hidden;
+    box-shadow:0 8px 20px rgba(0,0,0,.35);
+    border:1px solid rgba(255,255,255,.05);
   }
 
   .hero{ position:relative; height:280px; background:var(--card); }
@@ -73,11 +75,12 @@
   <div class="card" role="group" aria-label="Pegel Rhein in Mainz">
 
     <div class="hero">
+      <!-- sanftere obere Welle -->
       <div class="wave top" aria-hidden="true">
         <svg viewBox="0 0 1200 100" preserveAspectRatio="none">
           <g class="mover">
-            <path fill="var(--wave1)" d="M0 50c120 30 240-30 360 0s240 30 360 0 240-30 360 0 240 30 360 0v50H0z"/>
-            <path fill="var(--wave1)" transform="translate(1200,0)" d="M0 50c120 30 240-30 360 0s240 30 360 0 240-30 360 0 240 30 360 0v50H0z"/>
+            <path fill="var(--wave1)" d="M0 50c120 15 240-15 360 0s240 15 360 0 240-15 360 0 240 15 360 0v50H0z"/>
+            <path fill="var(--wave1)" transform="translate(1200,0)" d="M0 50c120 15 240-15 360 0s240 15 360 0 240-15 360 0 240 15 360 0v50H0z"/>
           </g>
         </svg>
       </div>
@@ -184,3 +187,4 @@
 </script>
 </body>
 </html>
+
