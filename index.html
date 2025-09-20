@@ -7,9 +7,19 @@
 <meta http-equiv="Cache-Control" content="no-store" />
 <style>
   :root{
-    --bg:#0b1220; --card:#0f172a; --fg:#e5e7eb; --muted:#94a3b8;
-    --wave1:#60a5fa; --wave2:#1d4ed8;
-    --up:#dc2626; --flat:#94a3b8; --down:#16a34a;
+    /* Hintergrundfarben an Alamos-Grau angepasst */
+    --bg:#2c2f36;     /* Seitenhintergrund */
+    --card:#3a3d44;   /* Kartenhintergrund */
+    --fg:#e5e7eb; 
+    --muted:#a0a6b3;
+
+    /* Wellenfarben in passendem Blau */
+    --wave1:#3b82f6;  /* helleres Blau */
+    --wave2:#1e3a8a;  /* dunkleres Blau */
+
+    --up:#dc2626;     /* Rot = steigend */
+    --flat:#94a3b8;   /* Grau = gleichbleibend */
+    --down:#16a34a;   /* Grün = fallend */
   }
   *{box-sizing:border-box}
   html,body{height:100%}
@@ -20,36 +30,26 @@
   }
   .card{
     width:100%; max-width:760px; background:var(--card);
-    border-radius:20px; overflow:hidden; box-shadow:0 18px 50px rgba(0,0,0,.35);
+    border-radius:20px; overflow:hidden; box-shadow:0 12px 30px rgba(0,0,0,.35);
   }
 
-  /* ===== Hero mit endlosen Wellen ===== */
-  .hero{
-    position:relative;
-    height:280px; /* mehr Gesamthöhe für sicheren Abstand */
-    background:linear-gradient(180deg,#0b1220 0%, #0e1730 100%);
-  }
+  .hero{ position:relative; height:280px; background:var(--card); }
 
-  /* Wellen – nahtlos (Path 2× nebeneinander, animierte Gruppe) */
   .wave{ position:absolute; left:0; right:0; height:105px; overflow:hidden; pointer-events:none; }
-  .wave.top{ top:0; transform:rotate(180deg); opacity:.55 }
-  .wave.bot{ bottom:0; opacity:.45 }
+  .wave.top{ top:0; transform:rotate(180deg); opacity:.6 }
+  .wave.bot{ bottom:0; opacity:.6 }
   .wave svg{ width:200%; height:100%; display:block }
   .mover{ animation:slide 14s linear infinite }
   .mover.slow{ animation-duration:20s }
   @keyframes slide { from{ transform:translateX(0) } to{ transform:translateX(-50%) } }
 
-  /* ===== Center-Bereich: garantiert freier Raum zwischen den Wellen =====
-     -> top/bottom definieren den Sicherheitsabstand zu den Wellen. */
   .center{
     position:absolute; left:0; right:0;
-    top:120px;   /* ↑ Abstand zur oberen Welle */
-    bottom:120px;/* ↓ Abstand zur unteren Welle */
+    top:120px; bottom:120px;
     display:flex; flex-direction:column; align-items:center; justify-content:center;
     gap:10px; text-align:center;
   }
 
-  /* Titel direkt über der Zahl – mit leichtem, dunklem Pill-Overlay */
   .place{
     font-size:22px; font-weight:800; letter-spacing:.25px;
     background:rgba(0,0,0,.35); padding:4px 12px; border-radius:12px;
@@ -57,11 +57,9 @@
     white-space:nowrap;
   }
 
-  /* Große Zahl */
   .value{ font-size:96px; font-weight:900; line-height:1; letter-spacing:.5px }
   .unit{ font-size:24px; margin-left:8px; opacity:.95 }
 
-  /* ===== Body unter der unteren Welle ===== */
   .inner{
     padding:16px 22px 22px; display:flex; flex-direction:column; align-items:center; text-align:center
   }
@@ -69,29 +67,12 @@
   .trend{ margin-top:8px; display:flex; align-items:center; justify-content:center; gap:12px; font-size:22px; font-weight:800 }
   .trend svg{ width:40px; height:40px; display:block }
   .err{ margin:12px 0 6px; color:#fecaca; min-height:1.2em; font-size:14px; text-align:center }
-
-  /* Debug-Hilfslinien: zeigen den freien Center-Raum */
-  .debug .center::before,
-  .debug .center::after{
-    content:""; position:absolute; left:0; right:0; height:0;
-    border-top:2px dashed rgba(255,255,255,.35);
-  }
-  .debug .center::before{ top:-1px }   /* obere Grenze des Center-Bereichs */
-  .debug .center::after{ bottom:-1px } /* untere Grenze des Center-Bereichs */
-
-  /* Kleinere Screens */
-  @media (max-width:460px){
-    .hero{ height:260px }
-    .center{ top:110px; bottom:110px }
-    .value{ font-size:72px } .trend svg{ width:34px; height:34px }
-  }
 </style>
 </head>
 <body>
-  <div class="card" id="card" role="group" aria-label="Pegel Rhein in Mainz">
+  <div class="card" role="group" aria-label="Pegel Rhein in Mainz">
 
     <div class="hero">
-      <!-- Obere Welle -->
       <div class="wave top" aria-hidden="true">
         <svg viewBox="0 0 1200 100" preserveAspectRatio="none">
           <g class="mover">
@@ -100,8 +81,6 @@
           </g>
         </svg>
       </div>
-
-      <!-- Untere Welle -->
       <div class="wave bot" aria-hidden="true">
         <svg viewBox="0 0 1200 100" preserveAspectRatio="none">
           <g class="mover slow">
@@ -111,14 +90,12 @@
         </svg>
       </div>
 
-      <!-- Titel + Wert exakt zwischen den Wellen -->
       <div class="center">
         <div class="place" id="place">RHEIN in MAINZ</div>
         <div><span class="value" id="value">--</span><span class="unit">cm</span></div>
       </div>
     </div>
 
-    <!-- Body: alles unterhalb der unteren Welle -->
     <div class="inner">
       <div class="curr" id="curr">Aktueller Messwert: —</div>
       <div class="trend" id="trend" title="Tendenz"><span class="label">Tendenz:</span></div>
@@ -131,16 +108,11 @@
   const UUID = "a37a9aa3-45e9-4d90-9df6-109f3a28a5af"; // Mainz
   const BASE = "https://www.pegelonline.wsv.de/webservices/rest-api/v2";
 
-  const elCard  = document.getElementById("card");
   const elPlace = document.getElementById("place");
   const elValue = document.getElementById("value");
   const elCurr  = document.getElementById("curr");
   const elTrend = document.getElementById("trend");
   const elErr   = document.getElementById("err");
-
-  // Debug-Modus per URL-Hash: #debug=1
-  const hash = new URLSearchParams(location.hash.slice(1));
-  if (hash.get("debug") === "1") elCard.classList.add("debug");
 
   const fmtDateTime = (iso) => new Intl.DateTimeFormat("de-DE", {
     timeZone: "Europe/Berlin", dateStyle: "short", timeStyle: "short"
@@ -152,7 +124,6 @@
     return r.json();
   }
 
-  // lineare Regression (24h) → cm/h
   function slopePerHour(points){
     if(points.length < 2) return 0;
     const t0 = points[0].t;
@@ -165,9 +136,8 @@
     return den===0 ? 0 : num/den;
   }
 
-  // Symbole: ▲ rot / ≈ grau / ▼ grün
   function trendIcon(slope){
-    const upT=0.5, downT=-0.5; // cm/h
+    const upT=0.5, downT=-0.5; 
     if (slope > upT)   return {name:"steigend", color:"var(--up)",
       svg:'<path d="M14 24V4M14 4l7 7M14 4l-7 7" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/>'};
     if (slope < downT) return {name:"fallend",  color:"var(--down)",
