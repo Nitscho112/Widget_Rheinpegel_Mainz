@@ -7,35 +7,35 @@
 <meta http-equiv="Cache-Control" content="no-store" />
 <style>
   :root{
-    /* Dunkleres Grau für AMweb */
-    --bg:#2a2d32;     
-    --card:#2a2d32;   
+    --bg:#2a2d32;
+    --card:#2a2d32;
     --fg:#e7e9ee;
     --muted:#a0a6b3;
 
-    /* Wellen in passendem Blau */
-    --wave1:#3b82f6;  
-    --wave2:#1e3a8a;  
+    --wave1:#3b82f6;   /* oben (sanft) */
+    --wave2:#1e3a8a;   /* unten */
 
-    --up:#dc2626;     
-    --flat:#9aa3af;   
-    --down:#16a34a;   
+    --up:#dc2626;      /* Rot = steigend */
+    --flat:#9aa3af;    /* Grau = gleichbleibend */
+    --down:#16a34a;    /* Grün = fallend */
   }
+
   *{box-sizing:border-box}
-  html,body{height:100%}
-  body{
-    margin:0; background:var(--bg); color:var(--fg);
+  html,body{
+    height:100%; width:100%;
+    margin:0; padding:0;
+    background:var(--bg); color:var(--fg);
     font-family:system-ui,-apple-system,Segoe UI,Roboto,Arial,sans-serif;
-    display:flex; align-items:center; justify-content:center; padding:12px
-  }
-  .card{
-    width:100%; max-width:760px; background:var(--card);
-    border-radius:20px; overflow:hidden;
-    box-shadow:0 8px 20px rgba(0,0,0,.35);
-    border:1px solid rgba(255,255,255,.05);
   }
 
-  .hero{ position:relative; height:280px; background:var(--card); }
+  .card{
+    width:100%; height:100%;
+    background:var(--card);
+    border:none; border-radius:0; box-shadow:none;
+    overflow:hidden; display:flex; flex-direction:column;
+  }
+
+  .hero{ position:relative; height:280px; background:var(--card); flex:0 0 auto; }
 
   .wave{ position:absolute; left:0; right:0; height:105px; overflow:hidden; pointer-events:none; }
   .wave.top{ top:0; transform:rotate(180deg); opacity:.6 }
@@ -51,29 +51,38 @@
     display:flex; flex-direction:column; align-items:center; justify-content:center;
     gap:10px; text-align:center;
   }
-
   .place{
     font-size:22px; font-weight:800; letter-spacing:.25px;
     background:rgba(0,0,0,.35); padding:4px 12px; border-radius:12px;
-    text-shadow:0 2px 6px rgba(0,0,0,.4);
-    white-space:nowrap;
+    text-shadow:0 2px 6px rgba(0,0,0,.4); white-space:nowrap;
   }
-
   .value{ font-size:96px; font-weight:900; line-height:1; letter-spacing:.5px }
   .unit{ font-size:24px; margin-left:8px; opacity:.95 }
 
   .inner{
-    padding:16px 22px 22px; display:flex; flex-direction:column; align-items:center; text-align:center
+    flex:1 1 auto; display:flex; flex-direction:column; align-items:center; text-align:center;
+    padding:16px 12px 18px; gap:10px;
   }
-  .curr{ font-size:16px; color:var(--muted); margin-bottom:8px }
-  .trend{ margin-top:8px; display:flex; align-items:center; justify-content:center; gap:12px; font-size:22px; font-weight:800 }
+  .curr{ font-size:16px; color:var(--muted) }
+
+  .trend{
+    display:flex; align-items:center; justify-content:center; gap:12px;
+    font-size:22px; font-weight:800; flex-wrap:wrap;
+  }
   .trend svg{ width:40px; height:40px; display:block }
-  .err{ margin:12px 0 6px; color:#fecaca; min-height:1.2em; font-size:14px; text-align:center }
+  .note{ font-size:13px; color:var(--muted); margin-top:4px }
+  .err{ color:#fecaca; min-height:1.2em; font-size:14px; text-align:center }
+
+  @media (max-width:480px){
+    .hero{ height:260px }
+    .center{ top:110px; bottom:110px }
+    .value{ font-size:74px }
+    .trend svg{ width:34px; height:34px }
+  }
 </style>
 </head>
 <body>
   <div class="card" role="group" aria-label="Pegel Rhein in Mainz">
-
     <div class="hero">
       <!-- sanftere obere Welle -->
       <div class="wave top" aria-hidden="true">
@@ -84,6 +93,7 @@
           </g>
         </svg>
       </div>
+      <!-- untere Welle -->
       <div class="wave bot" aria-hidden="true">
         <svg viewBox="0 0 1200 100" preserveAspectRatio="none">
           <g class="mover slow">
@@ -93,6 +103,7 @@
         </svg>
       </div>
 
+      <!-- Titel + Zahl zwischen den Wellen -->
       <div class="center">
         <div class="place" id="place">RHEIN in MAINZ</div>
         <div><span class="value" id="value">--</span><span class="unit">cm</span></div>
@@ -100,22 +111,25 @@
     </div>
 
     <div class="inner">
-      <div class="curr" id="curr">Aktueller Messwert: —</div>
+      <div class="curr" id="curr">Zuletzt gemessen: —</div>
       <div class="trend" id="trend" title="Tendenz"><span class="label">Tendenz:</span></div>
+      <div class="note">aus den letzten 10 Messungen</div>
       <div class="err" id="err" aria-live="polite"></div>
     </div>
-
   </div>
 
 <script>
   const UUID = "a37a9aa3-45e9-4d90-9df6-109f3a28a5af"; // Mainz
   const BASE = "https://www.pegelonline.wsv.de/webservices/rest-api/v2";
+  const LAST_N = 10; // Tendenz nur über die letzten N Messungen
 
   const elPlace = document.getElementById("place");
   const elValue = document.getElementById("value");
   const elCurr  = document.getElementById("curr");
   const elTrend = document.getElementById("trend");
   const elErr   = document.getElementById("err");
+
+  const THRESH = 0.5; // cm/h – Klassengrenze (steigend/fallend vs. gleichbleibend)
 
   const fmtDateTime = (iso) => new Intl.DateTimeFormat("de-DE", {
     timeZone: "Europe/Berlin", dateStyle: "short", timeStyle: "short"
@@ -127,6 +141,7 @@
     return r.json();
   }
 
+  // Regression → cm/h
   function slopePerHour(points){
     if(points.length < 2) return 0;
     const t0 = points[0].t;
@@ -140,10 +155,9 @@
   }
 
   function trendIcon(slope){
-    const upT=0.5, downT=-0.5; 
-    if (slope > upT)   return {name:"steigend", color:"var(--up)",
+    if (slope > THRESH)   return {name:"steigend", color:"var(--up)",
       svg:'<path d="M14 24V4M14 4l7 7M14 4l-7 7" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/>'};
-    if (slope < downT) return {name:"fallend",  color:"var(--down)",
+    if (slope < -THRESH)  return {name:"fallend",  color:"var(--down)",
       svg:'<path d="M14 4v20M14 24l7-7M14 24l-7-7" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/>'};
     return {name:"gleichbleibend", color:"var(--flat)",
       svg:'<text x="14" y="24" text-anchor="middle" font-size="24" fill="currentColor">≈</text>'};
@@ -155,6 +169,7 @@
       const station = await j(`${BASE}/stations/${UUID}.json`);
       elPlace.textContent = `${station.water?.longname || "RHEIN"} in ${station.longname || "MAINZ"}`;
 
+      // 24h holen, dann lokal auf letzte N Punkte begrenzen
       const startIso = new Date(Date.now()-24*3600*1000).toISOString();
       const ms = await j(`${BASE}/stations/${UUID}/W/measurements.json?start=${encodeURIComponent(startIso)}`);
       if(!Array.isArray(ms) || ms.length === 0) throw new Error("Keine Messwerte (24 h).");
@@ -166,16 +181,19 @@
 
       const last = points[points.length-1];
       elValue.textContent = Math.round(last.v);
-      elCurr.textContent  = `Aktueller Messwert: ${Math.round(last.v)} cm am ${fmtDateTime(last.t)}`;
+      elCurr.textContent  = `Zuletzt gemessen: ${fmtDateTime(last.t)}`;
 
-      const s = slopePerHour(points);
+      // nur letzte N Punkte für Tendenz
+      const ptsN = points.slice(-LAST_N);
+      const s = slopePerHour(ptsN); // cm/h aus letzten N Messungen
       const t = trendIcon(s);
+
       elTrend.innerHTML = `
         <span class="label">Tendenz:</span>
         <svg viewBox="0 0 28 28" aria-hidden="true" style="color:${t.color}">${t.svg}</svg>
         <span style="color:${t.color};font-weight:800">${t.name}</span>
       `;
-      elTrend.setAttribute("title", `Tendenz: ${t.name} (${s.toFixed(2)} cm/h)`);
+      elTrend.setAttribute("title", `Tendenz (aus den letzten ${LAST_N} Messungen): ${t.name}`);
 
     }catch(err){
       elErr.textContent = "Fehler: " + (err.message || err);
