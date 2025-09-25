@@ -7,84 +7,80 @@
 <meta http-equiv="Cache-Control" content="no-store" />
 <style>
   :root{
-    --bg:#2a2d32;
-    --card:#2a2d32;
-    --fg:#e7e9ee;
-    --muted:#a0a6b3;
+    --bg:#2a2d32; --card:#2a2d32;
+    --fg:#e7e9ee; --muted:#a0a6b3;
 
-    --wave1:#3b82f6;   /* oben (sanft) */
-    --wave2:#1e3a8a;   /* unten */
+    /* einfache Anfangs-Wellenfarben */
+    --wave1:#3b82f6;  /* oben hell */
+    --wave2:#1e3a8a;  /* unten dunkel */
 
-    --up:#dc2626;      /* Rot = steigend */
-    --flat:#9aa3af;    /* Grau = gleichbleibend */
-    --down:#16a34a;    /* Grün = fallend */
+    --up:#dc2626; --flat:#9aa3af; --down:#16a34a;
+
+    --chart-line:#9cc1ff;
+    --chart-fill:#3b82f6;
+    --forecast-line:#fbbf24;
+    --grid:rgba(255,255,255,.10);
+    --ticks:rgba(255,255,255,.45);
   }
 
   *{box-sizing:border-box}
   html,body{
-    height:100%; width:100%;
-    margin:0; padding:0;
+    height:100%; width:100%; margin:0; padding:0;
     background:var(--bg); color:var(--fg);
     font-family:system-ui,-apple-system,Segoe UI,Roboto,Arial,sans-serif;
+    font-size:18px;
   }
 
-  .card{
-    width:100%; height:100%;
-    background:var(--card);
-    border:none; border-radius:0; box-shadow:none;
-    overflow:hidden; display:flex; flex-direction:column;
-  }
+  .wrap{width:100%; height:100%; display:flex; align-items:flex-start; justify-content:center; padding:16px;}
+  .card{width:100%; max-width:1100px; background:var(--card); display:flex; flex-direction:column; align-items:center;}
 
-  .hero{ position:relative; height:280px; background:var(--card); flex:0 0 auto; }
-
-  .wave{ position:absolute; left:0; right:0; height:105px; overflow:hidden; pointer-events:none; }
-  .wave.top{ top:0; transform:rotate(180deg); opacity:.6 }
-  .wave.bot{ bottom:0; opacity:.6 }
-  .wave svg{ width:200%; height:100%; display:block }
-  .mover{ animation:slide 14s linear infinite }
-  .mover.slow{ animation-duration:20s }
-  @keyframes slide { from{ transform:translateX(0) } to{ transform:translateX(-50%) } }
+  /* ===== Hero mit den ursprünglichen, simplen Wellen ===== */
+  .hero{position:relative; height:280px; width:100%;}
+  .wave{position:absolute; left:0; right:0; height:105px; overflow:hidden; pointer-events:none}
+  .wave.top{top:0; transform:rotate(180deg); opacity:.6}
+  .wave.bot{bottom:0; opacity:.6}
+  .wave svg{width:200%; height:100%; display:block}
+  .mover{animation:slide 14s linear infinite}
+  .mover.slow{animation-duration:20s}
+  @keyframes slide{from{transform:translateX(0)}to{transform:translateX(-50%)}}
 
   .center{
-    position:absolute; left:0; right:0;
-    top:120px; bottom:120px;
-    display:flex; flex-direction:column; align-items:center; justify-content:center;
-    gap:10px; text-align:center;
+    position:absolute; left:0; right:0; top:126px; bottom:126px;
+    display:flex; flex-direction:column; align-items:center; justify-content:center; gap:10px; text-align:center;
   }
-  .place{
-    font-size:22px; font-weight:800; letter-spacing:.25px;
-    background:rgba(0,0,0,.35); padding:4px 12px; border-radius:12px;
-    text-shadow:0 2px 6px rgba(0,0,0,.4); white-space:nowrap;
-  }
-  .value{ font-size:96px; font-weight:900; line-height:1; letter-spacing:.5px }
-  .unit{ font-size:24px; margin-left:8px; opacity:.95 }
+  .place{font-size:26px; font-weight:800; letter-spacing:.25px; background:rgba(0,0,0,.35); padding:4px 12px; border-radius:12px; text-shadow:0 2px 6px rgba(0,0,0,.4); white-space:nowrap}
+  .value{font-size:100px; font-weight:900; line-height:1}
+  .unit{font-size:28px; margin-left:8px; opacity:.95}
 
-  .inner{
-    flex:1 1 auto; display:flex; flex-direction:column; align-items:center; text-align:center;
-    padding:16px 12px 18px; gap:10px;
-  }
-  .curr{ font-size:16px; color:var(--muted) }
+  /* ===== Unterer Bereich ===== */
+  .inner{width:100%; display:flex; flex-direction:column; align-items:center; gap:16px; padding:0 12px 20px}
+  .curr{font-size:18px; color:var(--muted)}
 
-  .trend{
-    display:flex; align-items:center; justify-content:center; gap:12px;
-    font-size:22px; font-weight:800; flex-wrap:wrap;
-  }
-  .trend svg{ width:40px; height:40px; display:block }
-  .note{ font-size:13px; color:var(--muted); margin-top:4px }
-  .err{ color:#fecaca; min-height:1.2em; font-size:14px; text-align:center }
+  .chart-wrap{width:100%; max-width:980px}
+  .chart{width:100%; height:260px; display:block; border-radius:12px; background:rgba(0,0,0,.12); overflow:visible}
+  .legend{display:flex; gap:16px; flex-wrap:wrap; justify-content:center; font-size:14px; color:var(--muted); margin-top:6px}
+  .legend span{display:inline-flex; align-items:center; gap:6px}
+  .dot{width:12px; height:4px; border-radius:2px; display:inline-block}
 
-  @media (max-width:480px){
-    .hero{ height:260px }
-    .center{ top:110px; bottom:110px }
-    .value{ font-size:74px }
-    .trend svg{ width:34px; height:34px }
+  .trend{display:flex; align-items:center; justify-content:center; gap:12px; font-size:24px; font-weight:800}
+  .trend svg{width:38px; height:38px}
+  .note{font-size:14px; color:var(--muted)}
+  .err{color:#fecaca; min-height:1.2em; font-size:14px; text-align:center}
+
+  @media (max-width:520px){
+    .hero{height:260px}
+    .center{top:112px; bottom:112px}
+    .value{font-size:82px}
+    .chart{height:240px}
   }
 </style>
 </head>
 <body>
+<div class="wrap">
   <div class="card" role="group" aria-label="Pegel Rhein in Mainz">
+
     <div class="hero">
-      <!-- sanftere obere Welle -->
+      <!-- Obere einfache Welle (wie am Anfang) -->
       <div class="wave top" aria-hidden="true">
         <svg viewBox="0 0 1200 100" preserveAspectRatio="none">
           <g class="mover">
@@ -93,7 +89,7 @@
           </g>
         </svg>
       </div>
-      <!-- untere Welle -->
+      <!-- Untere einfache Welle (wie am Anfang) -->
       <div class="wave bot" aria-hidden="true">
         <svg viewBox="0 0 1200 100" preserveAspectRatio="none">
           <g class="mover slow">
@@ -103,7 +99,6 @@
         </svg>
       </div>
 
-      <!-- Titel + Zahl zwischen den Wellen -->
       <div class="center">
         <div class="place" id="place">RHEIN in MAINZ</div>
         <div><span class="value" id="value">--</span><span class="unit">cm</span></div>
@@ -112,96 +107,226 @@
 
     <div class="inner">
       <div class="curr" id="curr">Zuletzt gemessen: —</div>
-      <div class="trend" id="trend" title="Tendenz"><span class="label">Tendenz:</span></div>
-      <div class="note">aus den letzten 10 Messungen</div>
-      <div class="err" id="err" aria-live="polite"></div>
+
+      <!-- 24h-Chart + Prognose -->
+      <div class="chart-wrap">
+        <svg id="chart" class="chart" viewBox="0 0 980 260" preserveAspectRatio="none" aria-label="24 h Verlauf + Prognose"></svg>
+        <div class="legend" id="legend">
+          <span><i class="dot" style="background:var(--chart-line)"></i> Verlauf 24 h</span>
+          <span><i class="dot" style="background:var(--forecast-line)"></i> Prognose (linear)</span>
+        </div>
+      </div>
+
+      <div class="trend" id="trend">Tendenz:</div>
+      <div class="note">Tendenz aus den letzten 10 Messungen • Prognose 6 h linear</div>
+      <div class="err" id="err"></div>
     </div>
+
   </div>
+</div>
 
 <script>
-  const UUID = "a37a9aa3-45e9-4d90-9df6-109f3a28a5af"; // Mainz
-  const BASE = "https://www.pegelonline.wsv.de/webservices/rest-api/v2";
-  const LAST_N = 10; // Tendenz nur über die letzten N Messungen
+/* ===== Marken (cm) – echte Werte einsetzen, null blendet aus ===== */
+const MARKS = { NW:null, MW:null, HW1:null, HW2:null, HW3:null };
 
-  const elPlace = document.getElementById("place");
-  const elValue = document.getElementById("value");
-  const elCurr  = document.getElementById("curr");
-  const elTrend = document.getElementById("trend");
-  const elErr   = document.getElementById("err");
+const UUID="a37a9aa3-45e9-4d90-9df6-109f3a28a5af";
+const BASE="https://www.pegelonline.wsv.de/webservices/rest-api/v2";
+const LAST_N=10, THRESH=0.5;
+const FORECAST_HOURS=6;
 
-  const THRESH = 0.5; // cm/h – Klassengrenze (steigend/fallend vs. gleichbleibend)
+const elPlace=document.getElementById("place");
+const elValue=document.getElementById("value");
+const elCurr=document.getElementById("curr");
+const elTrend=document.getElementById("trend");
+const elErr=document.getElementById("err");
+const elChart=document.getElementById("chart");
 
-  const fmtDateTime = (iso) => new Intl.DateTimeFormat("de-DE", {
-    timeZone: "Europe/Berlin", dateStyle: "short", timeStyle: "short"
-  }).format(new Date(iso));
+const fmtDateTime=iso=>new Intl.DateTimeFormat("de-DE",{timeZone:"Europe/Berlin",dateStyle:"short",timeStyle:"short"}).format(new Date(iso));
+const fmtTick=(ms)=>{
+  const d=new Date(ms);
+  const dd=("0"+d.getDate()).slice(-2), MM=("0"+(d.getMonth()+1)).slice(-2), hh=("0"+d.getHours()).slice(-2);
+  return {date:`${dd}.${MM}`, time:`${hh}:00`};
+};
 
-  async function j(url){
-    const r = await fetch(url, {cache:"no-store"});
-    if(!r.ok) throw new Error(r.status+" "+r.statusText);
-    return r.json();
+async function j(url){const r=await fetch(url,{cache:"no-store"});if(!r.ok)throw new Error(r.status+" "+r.statusText);return r.json();}
+
+/* ===== Regression cm/h ===== */
+function slopePerHour(points){
+  if(points.length<2)return 0;
+  const t0=points[0].t;
+  const xs=points.map(p=>(p.t-t0)/3600e3);
+  const ys=points.map(p=>p.v);
+  const mean=a=>a.reduce((x,y)=>x+y,0)/a.length;
+  const mx=mean(xs), my=mean(ys);
+  let num=0, den=0;
+  for(let i=0;i<xs.length;i++){const dx=xs[i]-mx,dy=ys[i]-my;num+=dx*dy;den+=dx*dx;}
+  return den===0?0:num/den;
+}
+function trendIcon(s){
+  if(s>THRESH)return{name:"steigend",color:"var(--up)",svg:'<path d="M14 24V4M14 4l7 7M14 4l-7 7" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/>'};
+  if(s<-THRESH)return{name:"fallend", color:"var(--down)",svg:'<path d="M14 4v20M14 24l7-7M14 24l-7-7" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/>'};
+  return{name:"gleichbleibend",color:"var(--flat)",svg:'<text x="14" y="24" text-anchor="middle" font-size="24" fill="currentColor">≈</text>'};
+}
+
+/* ===== Chart mit 10-cm-Skala und Datums-Ticks ===== */
+function drawChart(points, marks, forecastPts){
+  const W=980, H=260, PADL=88, PADR=60, PADT=20, PADB=66;
+  elChart.setAttribute("viewBox",`0 0 ${W} ${H}`);
+  elChart.innerHTML="";
+
+  if(points.length<2) return;
+
+  const dataMinT=points[0].t, dataMaxT=points[points.length-1].t;
+  const maxT = forecastPts?.length ? forecastPts[forecastPts.length-1].t : dataMaxT;
+  const minX=dataMinT, maxX=maxT;
+
+  const ys=points.map(p=>p.v).concat((forecastPts||[]).map(p=>p.v));
+  const markVals=Object.values(marks).filter(v=>typeof v==="number");
+  let minY=Math.min(...ys, ...(markVals.length?markVals:[ys[0]]));
+  let maxY=Math.max(...ys, ...(markVals.length?markVals:[ys[ys.length-1]]));
+  const pad=Math.max(4,(maxY-minY)*0.08);
+  minY -= pad; maxY += pad;
+  // auf „glatte“ 10er runden
+  let minY10=Math.floor(minY/10)*10;
+  let maxY10=Math.ceil(maxY/10)*10;
+  if (maxY10 - minY10 < 30) {
+    const mid=(minY10+maxY10)/2;
+    minY10=Math.floor((mid-15)/10)*10;
+    maxY10=Math.ceil((mid+15)/10)*10;
+  }
+  let step=10; while((maxY10-minY10)/step>8) step+=10;
+
+  const toX=t=>PADL+(t-minX)/(maxX-minX)*(W-PADL-PADR);
+  const toY=v=>H-PADB-(v-minY10)/(maxY10-minY10)*(H-PADT-PADB);
+
+  // horizontales Grid + Y-Labels (10er-Ticks)
+  for(let yv=minY10; yv<=maxY10+0.5; yv+=step){
+    const y=toY(yv);
+    const line=document.createElementNS("http://www.w3.org/2000/svg","line");
+    line.setAttribute("x1",PADL); line.setAttribute("x2",W-PADR);
+    line.setAttribute("y1",y); line.setAttribute("y2",y);
+    line.setAttribute("stroke","var(--grid)");
+    elChart.appendChild(line);
+
+    const txt=document.createElementNS("http://www.w3.org/2000/svg","text");
+    txt.setAttribute("x",PADL+8); txt.setAttribute("y",y+6);
+    txt.setAttribute("fill","var(--muted)"); txt.setAttribute("font-size","16");
+    txt.setAttribute("text-anchor","start");
+    txt.textContent=`${Math.round(yv)} cm`;
+    elChart.appendChild(txt);
   }
 
-  // Regression → cm/h
-  function slopePerHour(points){
-    if(points.length < 2) return 0;
-    const t0 = points[0].t;
-    const xs = points.map(p => (p.t - t0)/3600_000);
-    const ys = points.map(p => p.v);
-    const mean = a => a.reduce((x,y)=>x+y,0)/a.length;
-    const mx = mean(xs), my = mean(ys);
-    let num=0, den=0;
-    for(let i=0;i<xs.length;i++){ const dx=xs[i]-mx, dy=ys[i]-my; num += dx*dy; den += dx*dx; }
-    return den===0 ? 0 : num/den;
+  // X-Achse + Ticks alle 4h (zweizeilig: Datum / Zeit)
+  const axis=document.createElementNS("http://www.w3.org/2000/svg","line");
+  axis.setAttribute("x1",PADL); axis.setAttribute("x2",W-PADR);
+  axis.setAttribute("y1",H-PADB); axis.setAttribute("y2",H-PADB);
+  axis.setAttribute("stroke","var(--grid)");
+  elChart.appendChild(axis);
+
+  const end=new Date(maxX);
+  const start=new Date(end.getTime()-24*3600e3);
+  start.setMinutes(0,0,0);
+  for(let t=new Date(start); t<=end; t=new Date(t.getTime()+4*3600e3)){
+    const x=toX(t.getTime()); if(x<PADL||x>W-PADR) continue;
+    const tick=document.createElementNS("http://www.w3.org/2000/svg","line");
+    tick.setAttribute("x1",x); tick.setAttribute("x2",x);
+    tick.setAttribute("y1",H-PADB); tick.setAttribute("y2",H-PADB+8);
+    tick.setAttribute("stroke","var(--ticks)"); tick.setAttribute("stroke-width","1.5");
+    elChart.appendChild(tick);
+
+    const lab=document.createElementNS("http://www.w3.org/2000/svg","text");
+    lab.setAttribute("x",x); lab.setAttribute("y",H-PADB+24);
+    lab.setAttribute("fill","var(--muted)"); lab.setAttribute("font-size","14");
+    lab.setAttribute("text-anchor","middle");
+    const {date,time}=fmtTick(t.getTime());
+    lab.innerHTML=`<tspan x="${x}" dy="0">${date}</tspan><tspan x="${x}" dy="16">${time}</tspan>`;
+    elChart.appendChild(lab);
   }
 
-  function trendIcon(slope){
-    if (slope > THRESH)   return {name:"steigend", color:"var(--up)",
-      svg:'<path d="M14 24V4M14 4l7 7M14 4l-7 7" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/>'};
-    if (slope < -THRESH)  return {name:"fallend",  color:"var(--down)",
-      svg:'<path d="M14 4v20M14 24l7-7M14 24l-7-7" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/>'};
-    return {name:"gleichbleibend", color:"var(--flat)",
-      svg:'<text x="14" y="24" text-anchor="middle" font-size="24" fill="currentColor">≈</text>'};
+  // Verlauf (Fläche + Linie)
+  let d=`M ${toX(points[0].t)} ${toY(points[0].v)}`;
+  for(let i=1;i<points.length;i++) d+=` L ${toX(points[i].t)} ${toY(points[i].v)}`;
+  const area=document.createElementNS("http://www.w3.org/2000/svg","path");
+  area.setAttribute("d",`${d} L ${toX(points[points.length-1].t)} ${H-PADB} L ${toX(points[0].t)} ${H-PADB} Z`);
+  area.setAttribute("fill","var(--chart-fill)"); area.setAttribute("opacity","0.18");
+  elChart.appendChild(area);
+  const path=document.createElementNS("http://www.w3.org/2000/svg","path");
+  path.setAttribute("d",d); path.setAttribute("fill","none");
+  path.setAttribute("stroke","var(--chart-line)"); path.setAttribute("stroke-width","2.8");
+  elChart.appendChild(path);
+
+  // Prognose (gestrichelt)
+  if (forecastPts && forecastPts.length){
+    let df=`M ${toX(points[points.length-1].t)} ${toY(points[points.length-1].v)}`;
+    for(const p of forecastPts) df+=` L ${toX(p.t)} ${toY(p.v)}`;
+    const fpath=document.createElementNS("http://www.w3.org/2000/svg","path");
+    fpath.setAttribute("d",df); fpath.setAttribute("fill","none");
+    fpath.setAttribute("stroke","var(--forecast-line)"); fpath.setAttribute("stroke-width","2.8");
+    fpath.setAttribute("stroke-dasharray","6 6");
+    elChart.appendChild(fpath);
   }
 
-  async function load(){
-    elErr.textContent = "";
-    try{
-      const station = await j(`${BASE}/stations/${UUID}.json`);
-      elPlace.textContent = `${station.water?.longname || "RHEIN"} in ${station.longname || "MAINZ"}`;
+  // Marken (optional)
+  const addMark=(val,color,label)=>{
+    if(val==null) return;
+    const y=toY(val);
+    const m=document.createElementNS("http://www.w3.org/2000/svg","line");
+    m.setAttribute("x1",PADL); m.setAttribute("x2",W-PADR);
+    m.setAttribute("y1",y); m.setAttribute("y2",y);
+    m.setAttribute("stroke",color); m.setAttribute("stroke-width","1.6"); m.setAttribute("stroke-dasharray","6 6");
+    elChart.appendChild(m);
 
-      // 24h holen, dann lokal auf letzte N Punkte begrenzen
-      const startIso = new Date(Date.now()-24*3600*1000).toISOString();
-      const ms = await j(`${BASE}/stations/${UUID}/W/measurements.json?start=${encodeURIComponent(startIso)}`);
-      if(!Array.isArray(ms) || ms.length === 0) throw new Error("Keine Messwerte (24 h).");
+    const txt=document.createElementNS("http://www.w3.org/2000/svg","text");
+    txt.setAttribute("x",W-PADR+8); txt.setAttribute("y",y+4);
+    txt.setAttribute("fill",color); txt.setAttribute("font-size","14");
+    txt.textContent=`${label} (${val} cm)`;
+    elChart.appendChild(txt);
+  };
+  const css=getComputedStyle(document.documentElement);
+  addMark(MARKS.NW,  css.getPropertyValue('--mark-nw')  || '#38bdf8', 'NW');
+  addMark(MARKS.MW,  css.getPropertyValue('--mark-mw')  || '#94a3b8', 'MW');
+  addMark(MARKS.HW1, css.getPropertyValue('--mark-hw1') || '#f59e0b', 'HW1');
+  addMark(MARKS.HW2, css.getPropertyValue('--mark-hw2') || '#ef4444', 'HW2');
+  addMark(MARKS.HW3, css.getPropertyValue('--mark-hw3') || '#991b1b', 'HW3');
+}
 
-      const points = ms
-        .filter(m => m.value != null && m.timestamp)
-        .map(m => ({ t: Date.parse(m.timestamp), v: Number(m.value) }))
-        .sort((a,b)=>a.t-b.t);
+/* ===== Daten laden ===== */
+async function load(){
+  elErr.textContent="";
+  try{
+    const station=await j(`${BASE}/stations/${UUID}.json`);
+    elPlace.textContent=`${station.water?.longname||"RHEIN"} in ${station.longname||"MAINZ"}`;
 
-      const last = points[points.length-1];
-      elValue.textContent = Math.round(last.v);
-      elCurr.textContent  = `Zuletzt gemessen: ${fmtDateTime(last.t)}`;
+    const startIso=new Date(Date.now()-24*3600e3).toISOString();
+    const ms=await j(`${BASE}/stations/${UUID}/W/measurements.json?start=${encodeURIComponent(startIso)}`);
+    const points=(ms||[])
+      .filter(m=>m?.value!=null && m?.timestamp)
+      .map(m=>({t:Date.parse(m.timestamp), v:Number(m.value)}))
+      .sort((a,b)=>a.t-b.t);
+    if(points.length<2) throw new Error("Zu wenige Messwerte (24 h).");
 
-      // nur letzte N Punkte für Tendenz
-      const ptsN = points.slice(-LAST_N);
-      const s = slopePerHour(ptsN); // cm/h aus letzten N Messungen
-      const t = trendIcon(s);
+    const last=points[points.length-1];
+    elValue.textContent=Math.round(last.v);
+    elCurr.textContent=`Zuletzt gemessen: ${fmtDateTime(last.t)}`;
 
-      elTrend.innerHTML = `
-        <span class="label">Tendenz:</span>
-        <svg viewBox="0 0 28 28" aria-hidden="true" style="color:${t.color}">${t.svg}</svg>
-        <span style="color:${t.color};font-weight:800">${t.name}</span>
-      `;
-      elTrend.setAttribute("title", `Tendenz (aus den letzten ${LAST_N} Messungen): ${t.name}`);
+    // Tendenz & Prognose
+    const recent=points.slice(-LAST_N);
+    const s=slopePerHour(recent); // cm/h
+    const t=trendIcon(s);
+    elTrend.innerHTML=`Tendenz: <svg viewBox="0 0 28 28" style="color:${t.color}">${t.svg}</svg> <span style="color:${t.color}">${t.name}</span>`;
 
-    }catch(err){
-      elErr.textContent = "Fehler: " + (err.message || err);
+    const forecastPts=[];
+    for(let h=1; h<=FORECAST_HOURS; h++){
+      forecastPts.push({ t:last.t + h*3600e3, v:last.v + s*h });
     }
-  }
 
-  load();
-  setInterval(load, 60*1000);
+    drawChart(points, MARKS, forecastPts);
+  }catch(err){
+    elErr.textContent="Fehler: "+(err.message||err);
+  }
+}
+load();
+setInterval(load,60e3);
 </script>
 </body>
 </html>
