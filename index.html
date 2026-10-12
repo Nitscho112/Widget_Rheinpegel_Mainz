@@ -12,9 +12,9 @@
     ?meld=550       Meldehöhe in cm
     ?hw1=610        Hochwassermarke I in cm
     ?hw2=710        Hochwassermarke II in cm
-    ?mzb=450        Umsetzen Mehrzweckboote ab … cm
-    ?rtb=500        Umsetzen Rettungsboote ab … cm
-    ?flb=600        Umsetzen Feuerlöschboot ab … cm
+    ?mzb=550        MZB 2 (FL MZ 2/79-1) höchstens bis … cm, darüber Tausch gegen MZB 21
+    ?mzb21=620      MZB 21 (FL MZ 21/79-1) kommt bis … cm aus dem Zollhafen
+    ?flb=170        Feuerlöschboot muss ab … cm (fallend) verlegt werden
     ?h=48           Zeitraum des Verlaufs in Stunden (Standard 24, max. 720)
     ?prognose=6     Stunden lineare Prognose (0 = aus)
     ?kennwerte=0    PEGELONLINE-Kennwerte (MNW/MW/MHW/HSW) ausblenden
@@ -56,8 +56,6 @@
   .num span{ font-size:calc(3.6*var(--u)); color:var(--muted); font-weight:700; margin-left:.15em; }
   .side{ display:flex; flex-direction:column; gap:calc(.9*var(--u)); align-items:flex-start; min-width:0; }
   .badge{ background:var(--st); color:var(--st-fg); font-weight:900; font-size:calc(2.6*var(--u)); padding:.25em .8em; border-radius:999px; max-width:100%; }
-  body[data-status="alarm"] .badge{ animation:pulse 1.5s infinite; }
-  @keyframes pulse{ 50%{ box-shadow:0 0 0 .4em rgba(239,68,68,.35); } }
   .trend{ display:flex; align-items:center; gap:.35em; font-size:calc(3.2*var(--u)); font-weight:900; color:var(--tc, var(--flat)); }
   .trend svg{ width:1em; height:1em; }
   .trend small{ font-size:.6em; font-weight:700; opacity:.85; }
@@ -73,15 +71,16 @@
   .boats:empty{ display:none; }
   .boat{ background:var(--panel-2); border-radius:12px; padding:calc(.8*var(--u)) calc(1.2*var(--u));
     border-left:6px solid var(--bc); display:grid; grid-template-columns:auto 1fr; column-gap:calc(1*var(--u)); align-items:center; min-width:0; }
-  .boat .k{ font-size:calc(2.7*var(--u)); font-weight:900; color:var(--bc); grid-row:span 2; }
+  .boat .k{ font-size:calc(2.7*var(--u)); font-weight:900; color:var(--bc); grid-row:span 2; white-space:nowrap; }
   .boat .a{ font-size:calc(1.5*var(--u)); color:var(--muted); white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
-  .boat .s{ font-size:calc(2.2*var(--u)); font-weight:900; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+  .boat .s{ font-size:calc(2*var(--u)); font-weight:900; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
   .boat.soon{ background:#3a2a0a; }
   .boat.soon .s{ color:#fbbf24; }
-  .boat.now{ background:#b91c1c; border-left-color:#fff; animation:boatBlink 1.2s steps(1) infinite; }
+  .boat.now{ background:#991b1b; border-left-color:#fff; }
   .boat.now .k, .boat.now .s, .boat.now .a{ color:#fff; }
   .boat.now .s{ overflow:visible; letter-spacing:.02em; }
-  @keyframes boatBlink{ 50%{ background:#7f1d1d; } }
+  .boat.now.blink{ animation:boatBlink 1.2s steps(1) infinite; }
+  @keyframes boatBlink{ 50%{ background:#450a0a; } }
 
   /* ===== Chart ===== */
   .chart svg{ position:absolute; inset:0; width:100%; height:100%; }
@@ -139,13 +138,19 @@ const CONFIG = {
     { id:"hw1",  kurz:"HW-Marke I",  latte:"HW I",  wert:null, stufe:"warn",  farbe:"#f97316" },
     { id:"hw2",  kurz:"HW-Marke II", latte:"HW II", wert:null, stufe:"alarm", farbe:"#ef4444", text:"Schifffahrt eingestellt" },
   ],
-  // Ab diesem Pegel müssen die Boote umgesetzt werden
+  // Grenzen der Boote. grenze:"max" = gilt bei steigendem Pegel (Wert = höchster Pegel),
+  // grenze:"min" = gilt bei fallendem Pegel (Wert = niedrigster Pegel).
   boote: [
-    { id:"mzb", kurz:"MZB", name:"Mehrzweckboote",  wert:null, farbe:"#22d3ee" },
-    { id:"rtb", kurz:"RTB", name:"Rettungsboote",   wert:null, farbe:"#a3e635" },
-    { id:"flb", kurz:"FLB", name:"Feuerlöschboot",  wert:null, farbe:"#f472b6" },
+    { id:"mzb",   kurz:"MZB 2",  name:"FL MZ 2/79-1",   wert:550, grenze:"max", farbe:"#22d3ee",
+      aktion:"TAUSCHEN", folge:"gegen FL MZ 21/79-1" },
+    { id:"mzb21", kurz:"MZB 21", name:"FL MZ 21/79-1",  wert:620, grenze:"max", farbe:"#a3e635",
+      aktion:"KEINE AUSFAHRT", folge:"aus dem Zollhafen" },
+    { id:"flb",   kurz:"FLB",    name:"Feuerlöschboot", wert:170, grenze:"min", farbe:"#f472b6",
+      aktion:"VERLEGEN", folge:"Pegel zu niedrig" },
   ],
   vorwarnungStunden: 24,   // Boot/Marke „bald“ markieren, wenn bei gleichem Anstieg in ≤ X h erreicht
+  blinkMinuten: 10,        // so lange blinkt eine Bootskachel nach dem Überschreiten, danach ruhig rot
+  ruheMinuten: 60,         // erst nach so langer Zeit auf der sicheren Seite blinkt eine neue Überschreitung wieder
 };
 
 const UUID = "a37a9aa3-45e9-4d90-9df6-109f3a28a5af"; // Pegel Mainz
@@ -395,20 +400,61 @@ function drawChart(m){
 }
 
 /* ===== Boote ===== */
+const verletzt = (b, v) => b.grenze === "min" ? v <= b.wert : v >= b.wert;
+
+/* Beginn der aktuellen Überschreitung laut Messreihe. Eine Rückkehr auf die sichere Seite,
+   die kürzer als ruheMinuten war, beendet sie nicht. null = Beginn liegt vor dem Datenzeitraum. */
+function ueberschrittenSeit(points, b){
+  const ruhe = CONFIG.ruheMinuten * 60e3;
+  let i = points.length - 1;
+  while (true){
+    while (i >= 0 && verletzt(b, points[i].v)) i--;
+    if (i < 0) return null;
+    const start = points[i + 1].t;
+    while (i >= 0 && !verletzt(b, points[i].v)) i--;
+    const sicherAb = i < 0 ? points[0].t : points[i + 1].t;
+    if (start - sicherAb >= ruhe) return start;
+    if (i < 0) return null;
+  }
+}
+
+/* Blinkzeit merken, damit ein Neuladen der Seite nicht erneut blinken lässt */
+const BLINK_KEY = "pegel-blink";
+let blinkSeen = {};
+try { blinkSeen = JSON.parse(localStorage.getItem(BLINK_KEY)) || {}; } catch(e){}
+function blinkt(b, start){
+  if (start == null) return false;
+  const key = `${b.id}@${start}`;
+  if (!(key in blinkSeen))   // Überschreitung zum ersten Mal gesehen – nur blinken, wenn sie frisch ist
+    blinkSeen[key] = Date.now() - start <= CONFIG.ruheMinuten * 60e3 ? Date.now() : 0;
+  return Date.now() - blinkSeen[key] < CONFIG.blinkMinuten * 60e3;
+}
+
 function renderBoats(m){
   const boats = CONFIG.boote.filter(b => b.wert != null);
+  const aktiv = {};
   $("boats").innerHTML = boats.map(b => {
-    const dist = b.wert - m.last.v;
-    let cls = "", s;
-    if (dist <= 0){ cls = "now"; s = "UMSETZEN"; }
+    const unten = b.grenze === "min";
+    const dist = unten ? m.last.v - b.wert : b.wert - m.last.v;   // Abstand bis zur Grenze
+    const speed = unten ? -m.slope : m.slope;                     // Annäherung in cm/h
+    const grenzText = unten ? `ab ${b.wert} cm ↓` : `bis ${b.wert} cm`;
+    let cls = "", s, a = grenzText;
+    if (dist <= 0){
+      cls = "now"; s = b.aktion; a = b.folge;
+      const start = ueberschrittenSeit(m.points, b);
+      if (blinkt(b, start)) cls += " blink";
+      if (start != null) aktiv[`${b.id}@${start}`] = blinkSeen[`${b.id}@${start}`];
+    }
     else {
-      const eta = m.slope > TREND_THRESH ? dist / m.slope : null;
-      if (eta != null && eta <= CONFIG.vorwarnungStunden){ cls = "soon"; s = `in ${fmtEta(eta)}`; }
+      const eta = speed > TREND_THRESH ? dist / speed : null;
+      if (eta != null && eta <= CONFIG.vorwarnungStunden){ cls = "soon"; s = `${b.aktion.toLowerCase()} in ${fmtEta(eta)}`; }
       else s = `noch ${Math.round(dist)} cm`;
     }
-    return `<div class="boat ${cls}" style="--bc:${b.farbe}" title="${b.name}: umsetzen ab ${b.wert} cm">
-      <span class="k">${b.kurz}</span><span class="a">ab ${b.wert} cm</span><span class="s">${s}</span></div>`;
+    return `<div class="boat ${cls}" style="--bc:${b.farbe}" title="${b.kurz} ${b.name}: ${grenzText}, danach ${b.aktion.toLowerCase()} (${b.folge})">
+      <span class="k">${b.kurz}</span><span class="a">${a}</span><span class="s">${s}</span></div>`;
   }).join("");
+  blinkSeen = aktiv;   // beendete Überschreitungen vergessen
+  try { localStorage.setItem(BLINK_KEY, JSON.stringify(aktiv)); } catch(e){}
 }
 
 /* ===== Laden & Anzeigen ===== */
