@@ -1,0 +1,154 @@
+<!doctype html>
+<html lang="de">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width,initial-scale=1" />
+<title>Pegel Mainz – Variante B</title>
+<!-- Variante B „Pegellatte“: Skala wie am Ufer mit Farbzonen, Wasser und Zeiger; rechts Zahl + Verlauf -->
+<style>
+  :root{
+    --bg:#111418; --panel:#1a1e24; --fg:#f1f5f9; --muted:#94a3b8;
+    --st:#22c55e; --st-fg:#05230f;
+    --up:#f87171; --down:#4ade80; --flat:#cbd5e1;
+    --u:min(1vw, 1.7vh);
+  }
+  body[data-status="warn"]  { --st:#f59e0b; --st-fg:#2a1700; }
+  body[data-status="alarm"] { --st:#ef4444; --st-fg:#fff; }
+  body[data-status="low"]   { --st:#38bdf8; --st-fg:#03202e; }
+  *{ box-sizing:border-box; }
+  html,body{ margin:0; height:100%; overflow:hidden; background:var(--bg); color:var(--fg);
+    font-family:system-ui,-apple-system,"Segoe UI",Roboto,Arial,sans-serif; font-variant-numeric:tabular-nums; }
+
+  .app{ height:100%; display:grid; grid-template-columns:minmax(150px, 26%) minmax(0,1fr); gap:calc(1.4*var(--u)); padding:calc(1.4*var(--u)); }
+  .gauge{ position:relative; background:var(--panel); border-radius:14px; overflow:hidden; min-height:0; }
+  .gauge svg{ position:absolute; inset:0; width:100%; height:100%; }
+  .gauge .wave{ animation:slide 6s linear infinite; }
+  @keyframes slide{ to{ transform:translateX(-60px); } }
+
+  .right{ display:grid; grid-template-rows:auto minmax(0,1fr); gap:calc(1.4*var(--u)); min-height:0; }
+  .head{ display:grid; grid-template-columns:auto 1fr; align-items:center; gap:calc(2.4*var(--u)); }
+  .place{ grid-column:1 / -1; font-size:calc(2.2*var(--u)); font-weight:800; letter-spacing:.12em; text-transform:uppercase; color:var(--muted); }
+  .num{ line-height:.9; white-space:nowrap; }
+  .num b{ font-size:calc(17*var(--u)); font-weight:900; letter-spacing:-.04em; }
+  .num span{ font-size:calc(3.6*var(--u)); color:var(--muted); font-weight:700; margin-left:.15em; }
+  .side{ display:flex; flex-direction:column; gap:calc(1*var(--u)); align-items:flex-start; }
+  .badge{ background:var(--st); color:var(--st-fg); font-weight:900; font-size:calc(2.6*var(--u)); padding:.25em .8em; border-radius:999px; }
+  body[data-status="alarm"] .badge{ animation:pulse 1.5s infinite; }
+  @keyframes pulse{ 50%{ box-shadow:0 0 0 .4em rgba(239,68,68,.35); } }
+  .trend{ display:flex; align-items:center; gap:.35em; font-size:calc(3.2*var(--u)); font-weight:900; color:var(--tc, var(--flat)); }
+  .trend svg{ width:1em; height:1em; }
+  .trend small{ font-size:.6em; font-weight:700; opacity:.85; }
+  body[data-trend="up"]   { --tc:var(--up); }
+  body[data-trend="down"] { --tc:var(--down); }
+  .facts{ font-size:calc(1.7*var(--u)); color:var(--muted); }
+  .facts b{ color:var(--fg); }
+  .hint{ font-size:calc(1.8*var(--u)); font-weight:800; color:#fde68a; }
+  .hint:empty{ display:none; }
+
+  .chart{ position:relative; background:var(--panel); border-radius:14px; min-height:0; }
+  .chart svg{ position:absolute; inset:0; width:100%; height:100%; }
+  .meta{ position:absolute; right:calc(1.2*var(--u)); top:calc(.8*var(--u)); font-size:calc(1.3*var(--u)); color:var(--muted); z-index:1; }
+  .meta.stale{ color:#fca5a5; font-weight:700; }
+
+  @media (max-aspect-ratio:5/4){
+    .app{ grid-template-columns:minmax(110px, 30%) minmax(0,1fr); }
+    .head{ grid-template-columns:1fr; gap:calc(1*var(--u)); }
+  }
+  .err{ position:fixed; bottom:4px; left:50%; transform:translateX(-50%); font-size:12px; color:#fecaca; background:#7f1d1d; padding:3px 8px; border-radius:6px; }
+  .err:empty{ display:none; }
+</style>
+</head>
+<body data-status="ok">
+<main class="app">
+  <section class="gauge"><svg id="gauge"></svg></section>
+  <section class="right">
+    <div class="head">
+      <div class="place" id="place">Rhein in Mainz</div>
+      <div class="num"><b id="value">--</b><span>cm</span></div>
+      <div class="side">
+        <div class="badge" id="status">Lade …</div>
+        <div class="trend" id="trend"></div>
+        <div class="facts" id="facts"></div>
+        <div class="hint" id="hint"></div>
+      </div>
+    </div>
+    <div class="chart"><div class="meta" id="meta"></div><svg id="chart"></svg></div>
+  </section>
+</main>
+<div class="err" id="err"></div>
+<script src="pegel-core.js"></script>
+<script>
+const $ = id => document.getElementById(id);
+const P = window.Pegel;
+const NS = "http://www.w3.org/2000/svg";
+const el = (t, a = {}, txt) => { const e = document.createElementNS(NS, t); for (const k in a) e.setAttribute(k, a[k]); if (txt != null) e.textContent = txt; return e; };
+
+function drawGauge(m){
+  const svg = $("gauge"), box = svg.parentElement;
+  const W = box.clientWidth, H = box.clientHeight;
+  svg.setAttribute("viewBox", `0 0 ${W} ${H}`); svg.innerHTML = "";
+  const vals = [m.last.v, ...Object.values(m.marks), m.th.warn, m.th.alarm].filter(x => typeof x === "number");
+  const lo = Math.max(0, Math.floor((Math.min(...vals) - 80) / 100) * 100);
+  const hi = Math.ceil((Math.max(...vals) + 60) / 100) * 100;
+  const PT = 18, PB = 18, toY = v => H - PB - (v - lo) / (hi - lo) * (H - PT - PB);
+  const fs = Math.max(11, Math.min(18, H / 34));
+
+  // Latte
+  const sx = W * 0.30, sw = Math.min(W * 0.26, 70);
+  svg.append(el("rect", { x:sx, y:PT - 6, width:sw, height:H - PT - PB + 12, rx:4, fill:"#f8fafc" }));
+  // Farbzonen links neben der Latte
+  const zx = sx - 12, zone = (a, b, c) => { if (a == null) return; const y1 = toY(Math.min(b ?? hi, hi)), y2 = toY(Math.max(a, lo));
+    svg.append(el("rect", { x:zx, y:y1, width:8, height:y2 - y1, rx:2, fill:c })); };
+  zone(lo, m.th.warn ?? hi, "#22c55e"); zone(m.th.warn, m.th.alarm ?? hi, "#f59e0b"); zone(m.th.alarm, hi, "#ef4444");
+  if (m.th.low != null) zone(lo, m.th.low, "#38bdf8");
+
+  // E-Teilung wie an einer echten Pegellatte (alle 10 cm, Zahlen alle 50/100 cm)
+  for (let v = lo; v <= hi; v += 10){
+    const y = toY(v), big = v % 100 === 0, mid = v % 50 === 0;
+    svg.append(el("rect", { x:sx, y:y - 1.5, width:big ? sw : mid ? sw * .7 : sw * .4, height:big ? 3 : 2, fill:big ? "#b91c1c" : "#111" }));
+    if (big || (mid && (hi - lo) <= 600))
+      svg.append(el("text", { x:sx + sw + 6, y:y + fs * .35, fill:big ? "#e2e8f0" : "#94a3b8", "font-size":big ? fs : fs * .85, "font-weight":big ? 800 : 600 }, v));
+  }
+
+  // Wasser
+  const wy = toY(m.last.v);
+  const clip = el("clipPath", { id:"cl" }); clip.append(el("rect", { x:0, y:0, width:W, height:H })); svg.append(clip);
+  const water = el("g", { "clip-path":"url(#cl)" });
+  const col = { ok:"#3b82f6", low:"#38bdf8", warn:"#f59e0b", alarm:"#ef4444" }[m.status.key];
+  let d = `M-60 ${wy}`; for (let x = -60; x <= W + 60; x += 30) d += ` Q ${x + 15} ${wy + (x / 30 % 2 ? 5 : -5)} ${x + 30} ${wy}`;
+  const wave = el("path", { class:"wave", d:`${d} L ${W + 60} ${H} L -60 ${H} Z`, fill:col, opacity:.45 });
+  water.append(wave); svg.append(water);
+
+  // Kennwerte als feine Linien
+  const mc = { MNW:"#38bdf8", MW:"#94a3b8", MHW:"#f59e0b", HSW:"#ef4444" };
+  for (const k in m.marks){
+    const y = toY(m.marks[k]);
+    svg.append(el("line", { x1:8, x2:zx - 4, y1:y, y2:y, stroke:mc[k], "stroke-width":2 }));
+    svg.append(el("text", { x:8, y:y - 4, fill:mc[k], "font-size":fs * .75, "font-weight":800 }, k));
+  }
+
+  // Zeiger mit Wert
+  const px = sx - 14, tag = `${m.value}`;
+  svg.append(el("path", { d:`M ${px} ${wy} l -12 -9 v 18 z`, fill:"#fff" }));
+  svg.append(el("line", { x1:px, x2:sx + sw, y1:wy, y2:wy, stroke:"#fff", "stroke-width":3 }));
+}
+
+const chartOpts = { line:"#93c5fd", endLabel:true };
+window.onPegelResize = m => { drawGauge(m); P.drawChart($("chart"), m, chartOpts); };
+window.renderPegel = m => {
+  $("place").textContent = m.title;
+  $("value").textContent = m.value;
+  $("status").textContent = m.status.text;
+  $("trend").innerHTML = `<svg viewBox="0 0 28 28">${P.ARROWS[m.trend.key]}</svg>${m.trend.text} <small>${P.fmtSigned(m.slope, 1)} cm/h</small>`;
+  $("facts").innerHTML = `${P.rangeLabel()}: <b>${P.fmtSigned(m.delta)} cm</b> · Min <b>${m.min}</b> · Max <b>${m.max}</b>`;
+  $("hint").textContent = m.nextTh?.etaH != null && m.nextTh.etaH <= 24
+    ? `⚠ ${m.nextTh.label} (${m.nextTh.value} cm) in ca. ${Math.max(1, Math.round(m.nextTh.etaH))} h`
+    : m.nextTh ? `noch ${Math.round(m.nextTh.dist)} cm bis ${m.nextTh.label}` : "";
+  $("meta").textContent = m.stale ? `⚠ Daten veraltet – ${P.fmtDateTime(m.last.t)}` : `Gemessen ${P.fmtDateTime(m.last.t)} Uhr`;
+  $("meta").classList.toggle("stale", m.stale);
+  drawGauge(m);
+  P.drawChart($("chart"), m, chartOpts);
+};
+</script>
+</body>
+</html>

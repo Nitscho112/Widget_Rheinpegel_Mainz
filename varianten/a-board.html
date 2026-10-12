@@ -1,0 +1,121 @@
+<!doctype html>
+<html lang="de">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width,initial-scale=1" />
+<title>Pegel Mainz – Variante A</title>
+<!-- Variante A „Leitstellen-Board“: Statusbalken, riesige Zahl, Kennzahl-Kacheln, Verlauf als Streifen -->
+<style>
+  :root{
+    --bg:#0b0d10; --tile:#16191e; --fg:#f5f7fa; --muted:#8b93a1;
+    --st:#22c55e; --st-fg:#05230f;
+    --up:#f87171; --down:#4ade80; --flat:#cbd5e1;
+    --u:min(1vw, 1.7vh);
+  }
+  body[data-status="warn"]  { --st:#f59e0b; --st-fg:#2a1700; }
+  body[data-status="alarm"] { --st:#ef4444; --st-fg:#fff; }
+  body[data-status="low"]   { --st:#38bdf8; --st-fg:#03202e; }
+  *{ box-sizing:border-box; }
+  html,body{ margin:0; height:100%; overflow:hidden; background:var(--bg); color:var(--fg);
+    font-family:system-ui,-apple-system,"Segoe UI",Roboto,Arial,sans-serif; font-variant-numeric:tabular-nums; }
+
+  .app{ height:100%; display:grid; grid-template-rows:auto minmax(0,1.25fr) minmax(0,1fr); gap:calc(1.2*var(--u)); padding:calc(1.2*var(--u)); }
+
+  .bar{ display:flex; align-items:center; justify-content:space-between; gap:1em;
+    background:var(--st); color:var(--st-fg); border-radius:10px; padding:.35em .8em;
+    font-size:calc(2.6*var(--u)); font-weight:900; letter-spacing:.04em; text-transform:uppercase; }
+  .bar small{ font-size:.55em; font-weight:700; letter-spacing:.02em; opacity:.85; text-transform:none; }
+  body[data-status="alarm"] .bar{ animation:blink 1.4s steps(1) infinite; }
+  @keyframes blink{ 50%{ filter:brightness(.7); } }
+
+  .main{ display:grid; grid-template-columns:minmax(0,1.1fr) minmax(0,1fr); gap:calc(1.2*var(--u)); min-height:0; }
+  .hero{ display:flex; flex-direction:column; justify-content:center; padding-left:calc(1*var(--u)); min-height:0; }
+  .place{ font-size:calc(2.2*var(--u)); font-weight:700; color:var(--muted); text-transform:uppercase; letter-spacing:.12em; }
+  .num{ display:flex; align-items:baseline; line-height:.9; }
+  .num b{ font-size:calc(19*var(--u)); font-weight:900; letter-spacing:-.04em; }
+  .num span{ font-size:calc(4*var(--u)); font-weight:700; color:var(--muted); margin-left:.2em; }
+  .meta{ font-size:calc(1.4*var(--u)); color:var(--muted); margin-top:.6em; }
+  .meta.stale{ color:#fca5a5; font-weight:700; }
+
+  .tiles{ display:grid; grid-template-columns:minmax(0,1fr) minmax(0,1fr); grid-template-rows:minmax(0,1fr) minmax(0,1fr); gap:calc(1.2*var(--u)); min-height:0; }
+  .tile{ background:var(--tile); border-radius:12px; padding:calc(1.2*var(--u)) calc(1.6*var(--u));
+    display:flex; flex-direction:column; justify-content:center; min-height:0; min-width:0; overflow:hidden; border-left:5px solid transparent; }
+  .tile h3{ margin:0 0 .25em; font-size:calc(1.5*var(--u)); font-weight:700; color:var(--muted); text-transform:uppercase; letter-spacing:.08em; }
+  .tile .v{ font-size:calc(4.6*var(--u)); font-weight:900; line-height:1; display:flex; align-items:center; gap:.2em; white-space:nowrap; }
+  .tile .v small{ font-size:.42em; font-weight:700; color:var(--muted); }
+  .tile .s{ font-size:calc(1.5*var(--u)); color:var(--muted); margin-top:.3em; }
+  .tile svg{ width:.85em; height:.85em; }
+  .t-trend{ border-left-color:var(--tc, var(--flat)); }
+  .t-trend .v{ color:var(--tc, var(--flat)); }
+  body[data-trend="up"]   { --tc:var(--up); }
+  body[data-trend="down"] { --tc:var(--down); }
+  .t-next{ border-left-color:var(--st); }
+
+  .chart{ position:relative; background:var(--tile); border-radius:12px; min-height:0; }
+  .chart svg{ position:absolute; inset:0; width:100%; height:100%; }
+  .chart .lbl{ position:absolute; right:calc(1.4*var(--u)); top:calc(.8*var(--u)); font-size:calc(1.4*var(--u)); color:var(--muted); font-weight:700; z-index:1; }
+
+  @media (max-aspect-ratio:5/4){
+    .main{ grid-template-columns:1fr; grid-template-rows:auto 1fr; }
+    .num b{ font-size:calc(16*var(--u)); }
+  }
+  .err{ position:fixed; bottom:4px; left:50%; transform:translateX(-50%); font-size:12px; color:#fecaca; background:#7f1d1d; padding:3px 8px; border-radius:6px; }
+  .err:empty{ display:none; }
+</style>
+</head>
+<body data-status="ok">
+<main class="app">
+  <div class="bar"><span id="status">Lade …</span><small id="since"></small></div>
+  <section class="main">
+    <div class="hero">
+      <div class="place" id="place">Rhein in Mainz</div>
+      <div class="num"><b id="value">--</b><span>cm</span></div>
+      <div class="meta" id="meta"></div>
+    </div>
+    <div class="tiles">
+      <div class="tile t-trend"><h3>Tendenz</h3><div class="v" id="trendV"></div><div class="s" id="trendS"></div></div>
+      <div class="tile"><h3 id="deltaH">Änderung</h3><div class="v" id="deltaV"></div><div class="s" id="deltaS"></div></div>
+      <div class="tile t-next"><h3 id="nextH">Nächste Schwelle</h3><div class="v" id="nextV"></div><div class="s" id="nextS"></div></div>
+      <div class="tile"><h3 id="fcH">Prognose</h3><div class="v" id="fcV" style="color:#fbbf24"></div><div class="s" id="fcS"></div></div>
+    </div>
+  </section>
+  <section class="chart"><div class="lbl" id="chartLbl"></div><svg id="chart"></svg></section>
+</main>
+<div class="err" id="err"></div>
+<script src="pegel-core.js"></script>
+<script>
+const $ = id => document.getElementById(id);
+const P = window.Pegel;
+const chartOpts = { line:"#e2e8f0", fill:"#94a3b8", grid:"rgba(255,255,255,.05)", text:"#6b7280" };
+window.onPegelResize = m => P.drawChart($("chart"), m, chartOpts);
+window.renderPegel = m => {
+  $("place").textContent = m.title;
+  $("value").textContent = m.value;
+  $("status").textContent = m.status.text;
+  $("since").textContent = m.stale ? "⚠ Daten veraltet" : `Stand ${P.fmtTime(m.last.t)} Uhr`;
+  $("meta").textContent = `Gemessen ${P.fmtDateTime(m.last.t)} • PEGELONLINE`;
+  $("meta").classList.toggle("stale", m.stale);
+
+  $("trendV").innerHTML = `<svg viewBox="0 0 28 28">${P.ARROWS[m.trend.key]}</svg>${P.fmtSigned(m.slope, 1)}<small>cm/h</small>`;
+  $("trendS").textContent = m.trend.text;
+  $("deltaH").textContent = `Änderung ${P.rangeLabel()}`;
+  $("deltaV").innerHTML = `${P.fmtSigned(m.delta)}<small>cm</small>`;
+  $("deltaS").textContent = `Min ${m.min} · Max ${m.max}`;
+  if (m.nextTh){
+    $("nextH").textContent = `bis ${m.nextTh.label}`;
+    $("nextV").innerHTML = `${Math.round(m.nextTh.dist)}<small>cm</small>`;
+    $("nextS").textContent = m.nextTh.etaH != null && m.nextTh.etaH <= 48 ? `bei Anstieg in ca. ${Math.max(1, Math.round(m.nextTh.etaH))} h` : `Schwelle ${m.nextTh.value} cm`;
+  } else {
+    $("nextH").textContent = "Schwelle";
+    $("nextV").innerHTML = m.th.alarm != null ? `über ${m.th.alarmLabel}` : "–";
+    $("nextS").textContent = "";
+  }
+  $("fcH").textContent = `Prognose +${P.FORECAST_H} h`;
+  $("fcV").innerHTML = m.forecastEnd != null ? `≈ ${Math.round(m.forecastEnd)}<small>cm</small>` : "–";
+  $("fcS").textContent = "linear, Schätzung";
+  $("chartLbl").textContent = `Verlauf ${P.rangeLabel()}`;
+  P.drawChart($("chart"), m, chartOpts);
+};
+</script>
+</body>
+</html>

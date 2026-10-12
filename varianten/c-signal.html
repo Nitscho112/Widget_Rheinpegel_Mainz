@@ -1,0 +1,92 @@
+<!doctype html>
+<html lang="de">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width,initial-scale=1" />
+<title>Pegel Mainz – Variante C</title>
+<!-- Variante C „Signalfläche“: komplette Fläche in Statusfarbe, maximale Fernwirkung, Verlauf als weiße Linie -->
+<style>
+  :root{
+    --bg1:#0f3d2e; --bg2:#0a2a20; --fg:#fff; --soft:rgba(255,255,255,.72);
+    --u:min(1vw, 1.7vh);
+  }
+  body[data-status="ok"]    { --bg1:#0e4a6e; --bg2:#082f49; }
+  body[data-status="low"]   { --bg1:#0e7490; --bg2:#164e63; }
+  body[data-status="warn"]  { --bg1:#b45309; --bg2:#78350f; }
+  body[data-status="alarm"] { --bg1:#b91c1c; --bg2:#7f1d1d; }
+  *{ box-sizing:border-box; }
+  html,body{ margin:0; height:100%; overflow:hidden; color:var(--fg);
+    background:radial-gradient(120% 90% at 30% 20%, var(--bg1), var(--bg2)); transition:background .8s;
+    font-family:system-ui,-apple-system,"Segoe UI",Roboto,Arial,sans-serif; font-variant-numeric:tabular-nums; }
+  body[data-status="alarm"]::after{ content:""; position:fixed; inset:0; pointer-events:none; box-shadow:inset 0 0 0 8px #fff; animation:flash 1.2s steps(1) infinite; }
+  @keyframes flash{ 50%{ box-shadow:inset 0 0 0 8px transparent; } }
+
+  .app{ height:100%; display:grid; grid-template-rows:auto minmax(0,1fr) minmax(0,.8fr) auto; padding:calc(1.6*var(--u)) calc(2.4*var(--u)); }
+  .top{ display:flex; justify-content:space-between; align-items:center; font-size:calc(2.4*var(--u)); font-weight:800; letter-spacing:.1em; text-transform:uppercase; }
+  .top .st{ background:rgba(255,255,255,.95); color:var(--bg2); padding:.2em .8em; border-radius:999px; letter-spacing:.04em; }
+
+  .center{ display:flex; align-items:center; justify-content:center; gap:calc(3*var(--u)); min-height:0; }
+  .num{ line-height:.85; white-space:nowrap; text-shadow:0 4px 30px rgba(0,0,0,.25); }
+  .num b{ font-size:calc(26*var(--u)); font-weight:900; letter-spacing:-.05em; }
+  .num span{ font-size:calc(5*var(--u)); font-weight:700; color:var(--soft); margin-left:.1em; }
+  .trend{ display:flex; flex-direction:column; align-items:center; gap:.1em; font-weight:900; }
+  .trend svg{ width:calc(11*var(--u)); height:calc(11*var(--u)); }
+  .trend .r{ font-size:calc(3.4*var(--u)); }
+  .trend .t{ font-size:calc(1.9*var(--u)); color:var(--soft); text-transform:uppercase; letter-spacing:.1em; }
+
+  .chart{ position:relative; min-height:0; }
+  .chart svg{ position:absolute; inset:0; width:100%; height:100%; }
+
+  .foot{ display:flex; justify-content:space-between; gap:1em; flex-wrap:wrap; font-size:calc(1.8*var(--u)); color:var(--soft); padding-top:.4em; }
+  .foot b{ color:#fff; }
+  .foot .hint{ color:#fff; font-weight:800; }
+  .stale{ color:#fecaca !important; font-weight:800; }
+
+  @media (max-aspect-ratio:5/4){
+    .center{ flex-direction:column; gap:calc(1*var(--u)); }
+    .trend{ flex-direction:row; gap:.4em; }
+    .trend svg{ width:calc(6*var(--u)); height:calc(6*var(--u)); }
+  }
+  .err{ position:fixed; bottom:4px; left:50%; transform:translateX(-50%); font-size:12px; color:#fff; background:#000a; padding:3px 8px; border-radius:6px; }
+  .err:empty{ display:none; }
+</style>
+</head>
+<body data-status="ok">
+<main class="app">
+  <div class="top"><span id="place">Rhein in Mainz</span><span class="st" id="status">Lade …</span></div>
+  <div class="center">
+    <div class="num"><b id="value">--</b><span>cm</span></div>
+    <div class="trend"><svg viewBox="0 0 28 28" id="arrow"></svg><span class="r" id="rate"></span><span class="t" id="ttext"></span></div>
+  </div>
+  <div class="chart"><svg id="chart"></svg></div>
+  <div class="foot"><span id="facts"></span><span class="hint" id="hint"></span><span id="meta"></span></div>
+</main>
+<div class="err" id="err"></div>
+<script src="pegel-core.js"></script>
+<script>
+const $ = id => document.getElementById(id);
+const P = window.Pegel;
+const chartOpts = {
+  line:"#ffffff", fill:"#ffffff", forecast:"#fde68a", grid:"rgba(255,255,255,.12)", axis:"rgba(255,255,255,.35)",
+  text:"rgba(255,255,255,.75)", bands:false, endLabel:true,
+  markColors:{ MNW:"#bae6fd", MW:"rgba(255,255,255,.7)", MHW:"#fde68a", HSW:"#fecaca" },
+};
+window.onPegelResize = m => P.drawChart($("chart"), m, chartOpts);
+window.renderPegel = m => {
+  $("place").textContent = m.title;
+  $("value").textContent = m.value;
+  $("status").textContent = m.status.text;
+  $("arrow").innerHTML = P.ARROWS[m.trend.key];
+  $("rate").textContent = `${P.fmtSigned(m.slope, 1)} cm/h`;
+  $("ttext").textContent = m.trend.text;
+  $("facts").innerHTML = `${P.rangeLabel()}: <b>${P.fmtSigned(m.delta)} cm</b> · Prognose +${P.FORECAST_H} h: <b>≈ ${Math.round(m.forecastEnd ?? m.value)} cm</b>`;
+  $("hint").textContent = m.nextTh?.etaH != null && m.nextTh.etaH <= 24
+    ? `⚠ ${m.nextTh.label} ${m.nextTh.value} cm in ca. ${Math.max(1, Math.round(m.nextTh.etaH))} h`
+    : m.nextTh ? `${Math.round(m.nextTh.dist)} cm bis ${m.nextTh.label}` : "";
+  $("meta").textContent = m.stale ? `⚠ Daten veraltet – ${P.fmtDateTime(m.last.t)}` : `Stand ${P.fmtDateTime(m.last.t)} Uhr`;
+  $("meta").classList.toggle("stale", m.stale);
+  P.drawChart($("chart"), m, chartOpts);
+};
+</script>
+</body>
+</html>
