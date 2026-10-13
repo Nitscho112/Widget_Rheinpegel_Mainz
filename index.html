@@ -160,8 +160,10 @@ const CONFIG = {
       aktion:"TAUSCHEN", folge:"gegen FL MZ 21/79-1" },
     { id:"mzb21", kurz:"FL MZ 21/79-1", latte:"21/79-1", name:"Mehrzweckboot",  wert:620, grenze:"max", farbe:"#a3e635",
       aktion:"KEINE AUSFAHRT", folge:"aus dem Zollhafen", ersetzt:"mzb" },
+    // FLB vorerst ausgeblendet (aktiv:false). Regel bleibt hinterlegt: ab 170 cm fallend verlegen.
+    // Wieder einschalten: aktiv:true setzen oder ?flb=170 an den Link hängen.
     { id:"flb",   kurz:"FLB",    name:"Feuerlöschboot", wert:170, grenze:"min", farbe:"#f472b6",
-      aktion:"VERLEGEN", folge:"Pegel zu niedrig" },
+      aktion:"VERLEGEN", folge:"Pegel zu niedrig", aktiv:false },
   ],
   vorwarnungStunden: 24,   // Boot/Marke „bald“ markieren, wenn bei gleichem Anstieg in ≤ X h erreicht
   blinkMinuten: 10,        // so lange blinkt eine Bootskachel nach dem Überschreiten, danach ruhig rot
@@ -173,7 +175,10 @@ const BASE = "https://www.pegelonline.wsv.de/webservices/rest-api/v2";
 
 const params = new URLSearchParams(location.search);
 const numParam = (k, def) => { const v = params.get(k); return v != null && v !== "" && isFinite(+v) ? +v : def; };
-for (const m of [...CONFIG.marken, ...CONFIG.boote]) m.wert = numParam(m.id, m.wert);
+for (const m of [...CONFIG.marken, ...CONFIG.boote]){
+  if (params.has(m.id)) m.aktiv = true;   // Wert im Link schaltet ein ausgeblendetes Boot ein
+  m.wert = numParam(m.id, m.wert);
+}
 const RANGE_H     = Math.min(720, Math.max(6, numParam("h", 24)));
 const FORECAST_H  = Math.min(48, Math.max(0, numParam("prognose", 6)));
 const SHOW_KW     = params.get("kennwerte") !== "0";
@@ -235,7 +240,7 @@ async function loadStation(){
 /* Boote, die beim Pegel v angezeigt werden (Ersatzboote erst, wenn das ersetzte Boot über seiner Grenze ist) */
 function sichtbareBoote(v){
   return CONFIG.boote.filter(b => {
-    if (b.wert == null) return false;
+    if (b.wert == null || b.aktiv === false) return false;
     if (!b.ersetzt) return true;
     const alt = CONFIG.boote.find(x => x.id === b.ersetzt);
     return alt?.wert != null && verletzt(alt, v);
