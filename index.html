@@ -5,6 +5,8 @@
 <meta name="viewport" content="width=device-width,initial-scale=1" />
 <title>Rhein in Mainz – Pegel</title>
 <meta http-equiv="Cache-Control" content="no-store" />
+<!-- Bei jeder Änderung hochzählen: laufende Anzeigen laden sich dann selbst neu -->
+<meta name="widget-version" content="2026-10-15.1" />
 <!--
   Pegel-Widget für das Alamos-Dashboard (Design „Pegellatte“).
 
@@ -20,6 +22,7 @@
     ?kennwerte=0    PEGELONLINE-Kennwerte (MNW/MW/MHW/HSW) ausblenden
     ?titel=...      eigener Titel
     ?bg=2c3650      Hintergrundfarbe (Hex ohne #); Standard durchsichtig
+    ?update=15      alle … Minuten auf neue Version prüfen und ggf. selbst neu laden (0 = aus)
 -->
 <style>
   /* Hintergrund durchsichtig, damit die Alamos-Kachel durchscheint; Flächen als helle Überlagerung */
@@ -67,6 +70,8 @@
   .hint{ font-size:calc(1.8*var(--u)); font-weight:800; color:#fde68a; }
   body[data-status="alarm"] .hint{ color:#fecaca; }
   .hint:empty{ display:none; }
+  body[data-stale="1"] .place{ color:#fff; background:#b45309; border-radius:8px; padding:.15em .5em; justify-self:start; }
+  body[data-stale="1"] .num{ opacity:.45; }
 
   /* ===== Boote ===== */
   .boats{ display:grid; grid-template-columns:repeat(auto-fit, minmax(0,1fr)); gap:calc(1*var(--u)); }
@@ -116,7 +121,7 @@
 
   @media (prefers-reduced-motion: reduce){ .wave, .badge, .boat{ animation:none !important; } }
 
-  .err{ position:fixed; bottom:4px; left:50%; transform:translateX(-50%); font-size:12px; color:#fecaca; background:#7f1d1d; padding:3px 8px; border-radius:6px; z-index:5; }
+  .err{ position:fixed; bottom:4px; left:50%; transform:translateX(-50%); font-size:max(13px, calc(1.6*var(--u))); color:#fecaca; background:#7f1d1d; padding:3px 8px; border-radius:6px; z-index:5; }
   .err:empty{ display:none; }
 </style>
 </head>
@@ -184,7 +189,7 @@ const FORECAST_H  = Math.min(48, Math.max(0, numParam("prognose", 6)));
 const SHOW_KW     = params.get("kennwerte") !== "0";
 const TITLE_OVR   = params.get("titel");
 if (/^[0-9a-f]{3,8}$/i.test(params.get("bg") || "")) document.documentElement.style.setProperty("--bg", "#" + params.get("bg"));
-const TREND_WINDOW_H = 2, TREND_THRESH = 0.5, STALE_MIN = 90;
+const TREND_WINDOW_H = 2, TREND_THRESH = 0.5, STALE_MIN = 45;   // Amt misst alle 15 min; > 45 min ohne neuen Wert = Problem
 
 /* Kennwerte aus PEGELONLINE */
 const KW_DEFS = { MNW:"#38bdf8", MW:"#94a3b8", MHW:"#c084fc", HSW:"#fb7185" };
@@ -510,13 +515,24 @@ async function load(){
   } catch(err){
     $("err").textContent = "Aktualisierung fehlgeschlagen: " + (err.message || err) + (model ? " – zeige letzte Daten" : "");
   }
+  zeigeAlter();
+}
+
+/* Messzeit sichtbar machen; bei veralteten Daten deutlich warnen – auch wenn der Abruf fehlschlägt */
+function zeigeAlter(){
+  if (!model) return;
+  const t = model.last.t, alt = (Date.now() - t) / 60e3 > STALE_MIN;
+  document.body.dataset.stale = alt ? "1" : "";
+  $("place").textContent = alt ? `⚠ Keine neuen Daten seit ${fmtTime(t)} Uhr` : `${title} · Stand ${fmtTime(t)} Uhr`;
+  $("meta").classList.toggle("stale", alt);
+  $("meta").textContent = alt ? `⚠ Daten veraltet – letzte Messung ${fmtDateTime(t)}`
+    : `Gemessen ${fmtDateTime(t)} Uhr · PEGELONLINE`;
 }
 
 function render(m){
   const trend = m.slope > TREND_THRESH ? ["up", "steigend"] : m.slope < -TREND_THRESH ? ["down", "fallend"] : ["flat", "gleichbleibend"];
   document.body.dataset.status = m.status.key;
   document.body.dataset.trend = trend[0];
-  $("place").textContent = title;
   $("value").textContent = Math.round(m.last.v);
   $("status").textContent = m.status.text + (m.status.sub ? ` – ${m.status.sub}` : "");
   $("trend").innerHTML = `<svg viewBox="0 0 28 28">${ARROWS[trend[0]]}</svg>${trend[1]} <small>${fmtSigned(m.slope, 1)} cm/h</small>`;
@@ -537,11 +553,6 @@ function render(m){
   }
   $("hint").textContent = hint;
 
-  const ageMin = (Date.now() - m.last.t) / 60e3;
-  $("meta").classList.toggle("stale", ageMin > STALE_MIN);
-  $("meta").textContent = ageMin > STALE_MIN ? `⚠ Daten veraltet – letzte Messung ${fmtDateTime(m.last.t)}`
-    : `Gemessen ${fmtDateTime(m.last.t)} Uhr · PEGELONLINE`;
-
   renderBoats(m);
   drawGauge(m);
   drawChart(m);
@@ -550,6 +561,26 @@ function render(m){
 new ResizeObserver(() => { if (model){ drawGauge(model); drawChart(model); } }).observe(document.body);
 load();
 setInterval(load, 60e3);
+
+/* ===== Selbstaktualisierung =====
+   Holt die Seite regelmäßig neu vom Server und vergleicht die widget-version.
+   Ist sie anders, lädt sich die Anzeige neu (mit _v=…, damit kein Zwischenspeicher greift). */
+const VERSION = document.querySelector('meta[name="widget-version"]')?.content;
+const UPDATE_MIN = Math.max(0, numParam("update", 15));
+async function pruefeUpdate(){
+  try{
+    const r = await fetch(`${location.pathname}?_check=${Date.now()}`, { cache:"no-store" });
+    if (!r.ok) return;
+    const doc = new DOMParser().parseFromString(await r.text(), "text/html");
+    const neu = doc.querySelector('meta[name="widget-version"]')?.content;
+    if (neu && VERSION && neu !== VERSION){
+      const u = new URL(location.href);
+      u.searchParams.set("_v", neu);
+      location.replace(u);
+    }
+  } catch(e){ /* offline o. Ä.: beim nächsten Mal erneut versuchen */ }
+}
+if (UPDATE_MIN > 0) setInterval(pruefeUpdate, UPDATE_MIN * 60e3);
 </script>
 </body>
 </html>
